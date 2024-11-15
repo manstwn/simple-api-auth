@@ -1,14 +1,14 @@
-// server.js
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
-const db = require("./db"); // Import the database connection
+const users = require("./users");
 
 dotenv.config();
 const app = express();
 app.use(express.json());
 
+// Use the PORT environment variable provided by Vercel (or fallback to 5000 for local development)
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -20,42 +20,22 @@ app.post("/register", async (req, res) => {
     return res.status(400).json({ message: "Username and password are required" });
   }
 
-  try {
-    // Check if the user already exists
-    const [existingUser] = await db.query("SELECT * FROM users WHERE username = ?", [username]);
-    if (existingUser.length > 0) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    // Hash the password and store the user in the database
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query("INSERT INTO users (username, password) VALUES (?, ?)", [username, hashedPassword]);
-    res.status(201).json({ message: "User registered successfully" });
-  } catch (error) {
-    console.error("Error during registration:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
+  const hashedPassword = await bcrypt.hash(password, 10);
+  users.push({ username, password: hashedPassword });
+  res.status(201).json({ message: "User registered successfully" });
 });
 
 // Login route
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
+  const user = users.find((user) => user.username === username);
 
-  try {
-    // Find the user in the database
-    const [users] = await db.query("SELECT * FROM users WHERE username = ?", [username]);
-    const user = users[0];
-
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: "Invalid username or password" });
-    }
-
-    const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: "1h" });
-    res.json({ token });
-  } catch (error) {
-    console.error("Error during login:", error);
-    res.status(500).json({ message: "Internal server error" });
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(401).json({ message: "Invalid username or password" });
   }
+
+  const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: "1h" });
+  res.json({ token });
 });
 
 // Middleware to protect routes
@@ -77,5 +57,5 @@ app.get("/protected", authenticateToken, (req, res) => {
   res.json({ message: `Hello ${req.user.username}, you accessed a protected route!` });
 });
 
-// Start the server
+// Start the server (use the dynamic port assigned by Vercel)
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
