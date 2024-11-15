@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 
 // Use the PORT environment variable provided by Vercel (or fallback to 5000 for local development)
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Register route
